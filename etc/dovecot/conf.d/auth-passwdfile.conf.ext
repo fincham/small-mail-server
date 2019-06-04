@@ -1,0 +1,27 @@
+auth_master_user_separator = *
+
+
+passdb {
+  driver = passwd-file
+  args = scheme=CRYPT username_format=%u /etc/dovecot/superusers
+  override_fields = userdb_pass=%w
+  master = yes
+  pass = yes
+}
+
+passdb {
+  driver = passwd-file
+  args = scheme=CRYPT username_format=%u /etc/dovecot/users
+  override_fields = userdb_pass=%w
+}
+
+# userdb {
+#   driver = passwd-file
+#   args = username_format=%u /etc/dovecot/users
+#   default_fields = uid=vmail gid=vmail home=/srv/mail/%u
+# }
+
+userdb {
+  driver = static
+  args = uid=vmail gid=vmail home=/srv/mail/%u
+}

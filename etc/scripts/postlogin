@@ -1,0 +1,85 @@
+#!/usr/bin/python
+
+import os
+import sys
+import base64
+import mmap
+import datetime
+from email.mime.text import MIMEText
+from subprocess import Popen, PIPE
+
+import GeoIP
+
+# stolen from <https://stackoverflow.com/questions/136168/get-last-n-lines-of-a-file-with-python-similar-to-tail>
+def tail(filename, n):
+    """Returns last n lines from the filename. No exception handling"""
+    size = os.path.getsize(filename)
+    with open(filename, "rb") as f:
+        # for Windows the mmap parameters are different
+        fm = mmap.mmap(f.fileno(), 0, mmap.MAP_SHARED, mmap.PROT_READ)
+        try:
+            for i in xrange(size - 1, -1, -1):
+                if fm[i] == '\n':
+                    n -= 1
+                    if n == -1:
+                        break
+            return fm[i + 1 if i else 0:].splitlines()
+        finally:
+            fm.close()
+
+def dovecot_continue():
+    try:
+        os.execv(sys.argv[1], sys.argv[1:])
+    except:
+        pass
+    sys.exit(1)
+
+if __name__ == "__main__":
+    geoip_lookup = GeoIP.new(GeoIP.GEOIP_STANDARD)
+    geoip6_lookup = GeoIP.open("/usr/share/GeoIP/GeoIPv6.dat", GeoIP.GEOIP_STANDARD)
+    ip = os.environ['IP']
+    user = os.environ['USER']
+
+    with open('/opt/hotplate/torupdate/list','r') as tor_list_file:
+        tor_ip = [line for line in tor_list_file.read().splitlines(False) if not line.startswith('#')]
+
+    if ip == '::1':
+        dovecot_continue()
+
+    if ':' in ip:
+        country = geoip6_lookup.country_code_by_addr_v6(ip)
+    else:
+        country = geoip_lookup.country_code_by_addr(ip)
+
+    if ip in tor_ip:
+        country = "Tor"
+
+    filename = "/opt/hotplate/mail/imap-logins/" + base64.b16encode(user) + '-' + "".join([c for c in user if c.isalpha() or c.isdigit()])
+
+    lines = []
+    last_country = None
+    try:
+        lines = tail(filename, 5)
+        last_country = lines[-1].split()[-1]
+    except:
+        
+        pass # first login
+
+    new_line = "%s %s %s\n" % (datetime.datetime.now(), ip, country)
+    with open(filename, 'a') as log_file:
+        log_file.write(new_line)
+
+    if last_country != country:
+        alert = "User %s has moved from %s to %s at %s. The login causing this alert was from the IP %s.\n\n" % (user, last_country, country, datetime.datetime.now(), ip)
+        alert += "Their last five logins:\n"
+        alert += "\n".join(lines)
+
+
+        alert_message = MIMEText(alert)
+        alert_message["From"] = "dovecot@mx.example.com"
+        alert_message["To"] = "foo@example.com"
+        alert_message["Subject"] = "Alert: %s moved from %s to %s" % (user, last_country, country)
+        p = Popen(["/usr/sbin/sendmail", "-t", "-oi"], stdin=PIPE)
+        p.communicate(alert_message.as_string())
+
+    dovecot_continue()

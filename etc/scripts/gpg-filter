@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# This is a proof of concept! Storing plaintexts in /tmp during processing is not desirable on a multiuser system.
+
+# Keys generated using:
+#
+# fingerprint=$(echo -n "${imap_password}" | gpg2 --batch --passphrase-fd 0 --quick-gen-key "Mail encryption key <${imap_user}>" ed25519 2>&1 | fgrep 'revocation certificate stored as' | sed -e 's/.*\///' -e 's/\..*//')
+# echo -n "${imap_password}" | gpg2 --batch --passphrase-fd 0 --quick-add-key "${fingerprint}" cv25519
+# 
+# Call this from dovecot with:
+#
+# plugin {
+#   mail_filter = gpg-filter read %u %{userdb:pass}
+#   mail_filter_out = gpg-filter-out write %u
+# }
+#
+# And configure dovecot to pass the un-encrypted mail password through:
+#  
+# passdb { 
+#   driver = passwd-file 
+#   args = scheme=CRYPT username_format=%u /etc/dovecot/users 
+#   override_fields = userdb_pass=%w 
+# }
+
+umask 027
+
+#options=($1)
+
+export GNUPGHOME="/srv/mail/.gnupg"
+export GPG_TTY="$(tty)"
+imap_user="$2"
+
+tempfile="$(mktemp /tmp/gpg-filter.XXXXXXXXXXXXXXXXXX)"
+outputbufferfile="$(mktemp /tmp/gpg-filter.XXXXXXXXXXXXXXXXXX)"
+cat > "${tempfile}"
+if  [[ "${imap_user}" = "michael@hotplate.co.nz" ]]; then
+    if [ "$1" = "write" ]; then
+        gpg --armor --batch --encrypt -r "${imap_user}" < "${tempfile}" > "${outputbufferfile}"
+        cat "${outputbufferfile}"
+    elif [ "$1" = "read" ]; then
+        imap_password="$3"
+        echo -n "${imap_password}" | gpg --quiet --pinentry-mode loopback --batch --passphrase-fd 0 --decrypt "${tempfile}" > "${outputbufferfile}"
+        cat "${outputbufferfile}"
+    fi
+else
+    cat "${tempfile}"
+fi
+
+rm -f "${tempfile}"
+rm -f "${outputbufferfile}"

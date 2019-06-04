@@ -1,0 +1,9 @@
+#!/bin/bash
+
+HOSTNAME="${COLLECTD_HOSTNAME:-localhost}"
+INTERVAL="${COLLECTD_INTERVAL:-10}"
+
+while sleep "$INTERVAL"; do
+    VALUE=$(/usr/sbin/postqueue -j | jq length | wc -l)
+    echo "PUTVAL \"$HOSTNAME/exec-mail/gauge-queue\" interval=$INTERVAL N:$VALUE"
+done

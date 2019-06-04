@@ -1,0 +1,94 @@
+# See /usr/share/postfix/main.cf.dist for a commented, more complete version
+
+
+# Debian specific:  Specifying a file name will cause the first
+# line of that file to be used as the name.  The Debian default
+# is /etc/mailname.
+myorigin = /etc/mailname
+
+smtpd_banner = $myhostname ESMTP $mail_name (Debian/GNU)
+biff = no
+
+# appending .domain is the MUA's job.
+append_dot_mydomain = no
+
+# Uncomment the next line to generate "delayed mail" warnings
+#delay_warning_time = 4h
+
+readme_directory = no
+
+# See http://www.postfix.org/COMPATIBILITY_README.html -- default to 2 on
+# fresh installs.
+compatibility_level = 2
+
+# General settings
+myhostname = mx.example.com
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+mydestination = mx.example.com, mx.localdomain, mx, localhost.example.com, localhost.localdomain, localhost
+relayhost = 
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+mailbox_size_limit = 0
+recipient_delimiter = +
+inet_interfaces = all
+inet_protocols = all
+
+# TLS parameters
+
+# disable re-negotiation in OpenSSL 1.1.x
+tls_ssl_options = 0x40000000 
+
+smtpd_tls_security_level = may
+smtpd_tls_auth_only = yes
+smtpd_tls_cert_file = /etc/letsencrypt/live/mx.example.com/fullchain.pem
+smtpd_tls_key_file = /etc/letsencrypt/live/mx.example.com/privkey.pem
+smtpd_tls_loglevel=1 
+
+# outgoing connections: smtp 
+smtp_dns_support_level = dnssec 
+smtp_host_lookup = dns 
+smtp_tls_protocols = !SSLv2,!SSLv3 
+smtp_tls_exclude_ciphers = MD5,SRP,PSK,aDSS,kECDH,kDH,SEED,IDEA,RC2,RC5,RC4 
+smtp_tls_security_level = dane
+smtp_tls_note_starttls_offer = yes 
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+smtp_tls_loglevel=1 
+
+# incoming connections: smtpd 
+smtpd_enforce_tls = no 
+smtpd_tls_protocols = !SSLv2,!SSLv3
+smtpd_tls_ciphers = high 
+smtpd_tls_exclude_ciphers = eNULL, aNULL, LOW, EXP, MEDIUM, ADH, AECDH, MD5, DSS, ECDSA, CAMELLIA128, CAMELLIA256, 3DES 
+tls_preempt_cipherlist      = yes
+smtpd_tls_mandatory_ciphers = high
+
+smtp_tls_mandatory_ciphers  = $smtpd_tls_mandatory_ciphers
+smtp_tls_ciphers            = $smtpd_tls_ciphers
+lmtp_tls_mandatory_ciphers  = $smtpd_tls_mandatory_ciphers
+lmtp_tls_ciphers            = $smtpd_tls_ciphers
+
+# Default SMTP restrictions
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination
+smtpd_recipient_restrictions = permit_mynetworks, reject_unverified_recipient, reject_unauth_destination
+unverified_recipient_reject_code = 550
+
+# Mailbox delivery
+virtual_transport = lmtp:unix:private/dovecot-lmtp
+lmtp_destination_recipient_limit = 1
+virtual_mailbox_domains = /etc/mail/domains
+virtual_alias_maps = hash:/etc/mail/aliases
+address_verify_negative_cache = yes
+
+# rspamd integration
+smtpd_milters=inet:localhost:11332
+
+# Testing postscreen
+postscreen_access_list = permit_mynetworks
+
+# Mailman stuff
+mailman_destination_recipient_limit = 1
+transport_maps = hash:/etc/postfix/transport
+relay_domains = lists.example.com
+
+message_size_limit = 1024000000
+smtp_tls_policy_maps = hash:/etc/starttls-policy/postfix_tls_policy

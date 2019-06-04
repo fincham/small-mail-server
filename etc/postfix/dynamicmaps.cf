@@ -1,0 +1,2 @@
+pcre	postfix-pcre.so	dict_pcre_open	
+sqlite	postfix-sqlite.so	dict_sqlite_open	

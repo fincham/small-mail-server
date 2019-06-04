@@ -1,0 +1,6 @@
+/^\s*Mime-Version: 1.0.*/ REPLACE Mime-Version: 1.0
+# /^\s*Received/ IGNORE
+# /^\s*User-Agent/ IGNORE
+/^\s*X-Enigmail/ IGNORE
+/^\s*X-Mailer/ IGNORE
+/^\s*X-Originating-IP/ IGNORE
